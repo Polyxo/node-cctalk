@@ -1,3 +1,9 @@
-var CoinDetector = require('./coindetector');
+module.exports =
+{
+  CCCommand: require('./command'),
+  CCBus: require('./bus'),
+  CCDevice: require('./device'),
+  CoinDetector: require('./coindetector')
+};
 
-var cd = new CoinDetector('/dev/ttyUSB0');
+var cd = new module.exports.CoinDetector('/dev/ttyUSB0');
