@@ -2,6 +2,7 @@ var SerialPort = require('serialport');
 var Promise = require('promise');
 var CCCommand = require('./command');
 var defaults = require('defaults-deep');
+var timeout = require('promise-timeout').timeout;
 
 function CCBus(port, config)
 {
@@ -23,7 +24,9 @@ function CCBus(port, config)
   this.ser.on('close', this.onClose);
   
   this.devices = {};
-  this.commandQueue = [];
+  
+  this.lastCommand = null;
+  this.commandChainPromise = Promise.resolve();
 }
 
 CCBus.prototype =
@@ -79,6 +82,17 @@ CCBus.prototype =
     {
       device.onData(command);
     }
+    
+    if(this.lastCommand)
+    {
+      var lastCommand = this.lastCommand;
+      this.lastCommand = null;
+      
+      if(command.command == 0)
+        lastCommand.resolve(command);
+      else
+        lastCommand.reject(command);
+    }
   },
   
   onClose: function onClose()
@@ -98,7 +112,7 @@ CCBus.prototype =
     }
   },
   
-  sendCommand: function sendCommand(command)
+  sendRawCommand: function sendCommand(command)
   {
     return new Promise(function(resolve, reject)
     {
@@ -112,7 +126,32 @@ CCBus.prototype =
         return resolve();
       });
     }.bind(this));
-  }
+  },
+  
+  sendCommand: function sendCommand(command)
+  {
+    // Send command with promised reply
+    // If you use this function, use it exclusively and don't forget to call _onData() if you override onData()
+    
+    var promise = timeout(new Promise(function(resolve, reject)
+    {
+      command.resolve = resolve;
+      command.reject = reject;
+    }.bind(this)), 1000);
+    
+    // use the command chain to send command only when previous commands have finished
+    // this way replies can be correctly attributed to commands
+    this.commandChainPromise = this.commandChainPromise
+    .catch(function() {})
+    .then(function()
+    {
+      this.lastCommand = command;
+      return this.sendRawCommand(command);
+    }.bind(this))
+    .then(function() { return promise; });
+    
+    return promise;
+  },
 };
 
 module.exports = exports = CCBus;
