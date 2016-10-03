@@ -38,15 +38,26 @@ Argument:
 
 ##### ccBus.sendCommand(command)
 
-Sends a command to the bus.
+Sends a command to the bus and waits for a reply.
 
 Argument:
-- command: a command object to send (must implement the CCCommand API)
+- command: a command object to send (must implement the CCCommand API). command.src will be set to the
+host address configured upon construction of the bus.
+Returns:
+- A promise that will fulfill with the reply from the device (as a ccCommand) as soon as it has been received,
+or be rejected with a serial port error or timeout error.
+
+##### ccBus.sendRawCommand(command)
+
+Sends a command to the bus without waiting for previous commands to be sent or the reply from the device. Mostly
+for internal use.
+
+Argument:
+- command: a command object to send (must implement the CCCommand API). command.src will be set to the
+host address configured upon construction of the bus.
 Returns:
 - a promise that will fulfill when the command has been sent to the bus but before an actual reply has
-been received.
-
-Sets command.src to the host address configured upon construction of the bus.
+been received or will be rejected with a serial port error.
 
 #### CCCommand
 
@@ -111,9 +122,6 @@ Called by the bus object when a reply has been received from the device.
 Arguments:
 - command: The data sent by the device as a ccCommand.
 
-**Note:** If you override this function and choose to use ccDevice.sendCommand(), be sure to call
-this._onData(command) in your implementation. Otherwise the internal list of commands will clog up.
-
 ##### ccDevice.onBusClosed()
 
 Called by the bus object after the serial port has been closed.
@@ -123,15 +131,9 @@ Called by the bus object after the serial port has been closed.
 High-level API to send commands and receive replies.
 
 Arguments:
-- command: The command to send (must implement CCCommand API)
+- command: The command to send (must implement CCCommand API). command.dest will be set to the device's address.
 Returns:
 - A promise that will fulfill with the reply from the device (as a ccCommand) as soon as it has been received.
-
-**Note:** If you use this function, don't use the raw ccBus.sendCommand() function to send data to this device.
-ccTalk commands and replies can only be matched when their order is known. Therefore a ccDevice keeps an internal
-list of commands and sends them one by one, waiting for a reply each time. Using ccBus.sendCommand() with a device
-address already in use might confuse this algorithm. Choose ccBus.sendCommand() or ccDevice.sendCommand() and stick
-with it!
 
 #### CoinDetector
 
