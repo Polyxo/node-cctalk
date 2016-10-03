@@ -139,7 +139,7 @@ Returns:
 
 Finally something useful! Implements a coin acceptor.
 
-**TODO** Implement a proper API
+**TODO** Document API
 
 Disclaimer
 ----------

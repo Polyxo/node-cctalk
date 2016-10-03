@@ -12,6 +12,7 @@ function CoinDetector(bus, config)
   CCDevice.apply(this, arguments);
   
   this.poll = this.poll.bind(this);
+  this.ready = false;
   
   // register last, after all device type specific variables have been set up!
   this.bus.registerDevice(this);
@@ -21,43 +22,28 @@ CoinDetector.prototype = new CCDeviceEmitter();
 
 CoinDetector.prototype.onBusReady = function onBusReady()
 {
-  console.log('port open');
-  /*
   this.sendCommand(new CCCommand(this.config.src, this.config.dest, 254, new Uint8Array(0)))
-    .then(function(reply)
+    .then(function()
     {
-      console.log("Simple poll ok!");
-      return this.sendCommand(new CCCommand(this.config.src, this.config.dest, 231, new Uint8Array(2).fill(0xFF)));
-    }.bind(this))
-    .then(function(reply)
+      this.ready = true;
+      this.pollInterval = setInterval(this.poll, 200);
+      this.emit('ready');
+    }.bind(this),
+    function(error)
     {
-      console.log("inhibitor mask ok!");
-      return this.sendCommand(new CCCommand(this.config.src, this.config.dest, 228, new Uint8Array(1).fill(0xFF)));
-    }.bind(this))
-    .then(function(reply)
-    {
-      console.log("inhibitor master ok!");
-      this.sendCommand(new CCCommand(this.config.src, this.config.dest, 222, new Uint8Array(2).fill(0x0F)));
-      setInterval(this.poll, 300);
-    }.bind(this))
-    .then(function(reply)
-    {
-      console.log("kassensteuerung ok!");
+      this.emit('error', new Error("Could not initialise device", error));
     }.bind(this));
-  */
   
-  this.sendCommand(new CCCommand(this.config.src, this.config.dest, 254, new Uint8Array(0)));
-  this.sendCommand(new CCCommand(this.config.src, this.config.dest, 231, new Uint8Array(2).fill(0xFF)));
-  this.sendCommand(new CCCommand(this.config.src, this.config.dest, 228, new Uint8Array(1).fill(0xFF))).then(function(reply)
-  {
-    this.pollInterval = setInterval(this.poll, 300);
-  }.bind(this));
-  this.sendCommand(new CCCommand(this.config.src, this.config.dest, 222, new Uint8Array(2).fill(0x0F)));
+};
+
+CoinDetector.prototype.onBusClosed = function onBusClosed()
+{
+  this.ready = false;
 };
   
 CoinDetector.prototype.poll = function poll()
 {
-  this.sendCommand(new CCCommand(this.config.src, this.config.dest, 229, new Uint8Array(0)))
+  this.sendCommand(new CCCommand(0, 0, CoinDetector.commands.readBufferedCredit, new Uint8Array(0)))
   .then(function(reply)
   {
     if(this.eventBuffer && reply.data[0] != this.eventBuffer[0])
@@ -75,12 +61,12 @@ CoinDetector.prototype.poll = function poll()
         switch(type)
         {
           case CoinDetector.eventCodes.accepted:
-          case CoinDetector.eventCodes.inhibited:
             var coin = reply.data[i];
             this.emit(CoinDetector.eventCodes[type], coin);
             break;
+          case CoinDetector.eventCodes.inhibited:
           case CoinDetector.eventCodes.rejected:
-            this.emit('rejected');
+            this.emit(CoinDetector.eventCodes[type]);
             break;
           case CoinDetector.eventCodes.return:
             this.emit('return');
@@ -94,6 +80,53 @@ CoinDetector.prototype.poll = function poll()
     }
     this.eventBuffer = reply.data;
   }.bind(this));
+};
+
+CoinDetector.prototype.setAcceptanceMask = function setAcceptanceMask(acceptanceMask)
+{
+  return this.sendCommand(new CCCommand(0, 0, CoinDetector.commands.modifyInhibitStatus,
+                                        Uint8Array.from([ acceptanceMask & 0xFF, (acceptanceMask >> 8) & 0xFF ])))
+    .catch(function(e)
+    {
+      this.emit('error', e);
+      throw e;
+    }.bind(this));
+};
+
+CoinDetector.prototype.enableAcceptance = function enableAcceptance()
+{
+  return this.sendCommand(new CCCommand(0, 0, CoinDetector.commands.modifyMasterInhibit, new Uint8Array(1).fill(0xFF)))
+    .catch(function(e)
+    {
+      this.emit('error', e);
+      throw e;
+    }.bind(this));
+};
+
+CoinDetector.prototype.disableAcceptance = function disableAcceptance()
+{
+  return this.sendCommand(new CCCommand(0, 0, CoinDetector.commands.modifyMasterInhibit, new Uint8Array(1).fill(0x00)))
+    .catch(function(e)
+    {
+      this.emit('error', e);
+      throw e;
+    }.bind(this));
+};
+
+CoinDetector.prototype.getCoinName = function getCoinName(channel)
+{
+  return this.sendCommand(new CCCommand(0, 0, CoinDetector.commands.requestCoinId,
+                                        Uint8Array.from([ channel ])))
+  .then(function(reply)
+  {
+    return String.fromCharCode.apply(null, reply.data);
+  }.bind(this));
+};
+
+CoinDetector.prototype.getCoinPosition = function getCoinPosition(channel)
+{
+  return this.sendCommand(new CCCommand(0, 0, CoinDetector.commands.requestCoinPosition,
+                                        Uint8Array.from([ channel ])));
 };
 
 CoinDetector.commands =
@@ -115,6 +148,7 @@ CoinDetector.commands =
   modifyInhibitStatus: 231,
   requestInhibitStatus: 230,
   readBufferedCredit: 229,
+  modifyMasterInhibit: 228,
   requestMasterInhibitStatus: 227,
   requestInsertionCounter: 226,
   requestAcceptCounter: 225,
