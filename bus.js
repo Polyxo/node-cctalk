@@ -23,6 +23,9 @@ function CCBus(port, config)
   this.onClose = this.onClose.bind(this);
   this.ser.on('close', this.onClose);
   
+  this.onError = this.onError.bind(this);
+  this.ser.on('error', this.onError);
+  
   this.devices = {};
   
   this.lastCommand = null;
@@ -35,7 +38,7 @@ CCBus.prototype =
   {
     this.parserBuffer.set(buffer, this.parserBuffer.cursor);
     this.parserBuffer.cursor += buffer.length;
-    if(this.parserBuffer.cursor > 1 && this.parserBuffer.cursor >= this.parserBuffer[1] + 5)
+    while(this.parserBuffer.cursor > 1 && this.parserBuffer.cursor >= this.parserBuffer[1] + 5)
     {
       // full frame accumulated
       var length = this.parserBuffer[1] + 5;
@@ -103,6 +106,11 @@ CCBus.prototype =
     }.bind(this));
   },
   
+  onError: function onError(err)
+  {
+    console.log("Serial port error", err);
+  },
+  
   registerDevice: function registerDevice(device)
   {
     this.devices[device.config.dest] = device;
@@ -137,7 +145,7 @@ CCBus.prototype =
     {
       command.resolve = resolve;
       command.reject = reject;
-    }.bind(this)), 1000);
+    }.bind(this)), this.config.timeout);
     
     // use the command chain to send command only when previous commands have finished
     // this way replies can be correctly attributed to commands

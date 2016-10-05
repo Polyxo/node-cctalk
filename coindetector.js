@@ -31,7 +31,7 @@ CoinDetector.prototype.onBusReady = function onBusReady()
     }.bind(this),
     function(error)
     {
-      this.emit('error', new Error("Could not initialise device", error));
+      this.emit('error', error);
     }.bind(this));
   
 };
@@ -40,7 +40,7 @@ CoinDetector.prototype.onBusClosed = function onBusClosed()
 {
   this.ready = false;
 };
-  
+
 CoinDetector.prototype.poll = function poll()
 {
   this.sendCommand(new CCCommand(0, 0, CoinDetector.commands.readBufferedCredit, new Uint8Array(0)))

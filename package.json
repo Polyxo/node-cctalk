@@ -1,6 +1,6 @@
 {
   "name": "cctalk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Interface coin acceptors and other hardware speaking ccTalk",
   "keywords": ["serial", "usb", "money", "coins", "hardware", "cctalk"],
   "email": "lukas@polyxo.de",
