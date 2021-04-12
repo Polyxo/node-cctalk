@@ -10,7 +10,7 @@
     "defaults-deep": "^0.2.3",
     "promise": "^7.1.1",
     "promise-timeout": "^1.0.0",
-    "serialport": "^4.0.1"
+    "serialport": "^9.0.3"
   },
   "license" : "BSD-2-Clause",
   "repository":
